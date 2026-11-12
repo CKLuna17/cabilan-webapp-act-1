@@ -1,0 +1,148 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "User account information and role metadata",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "User UID",
+          "maxLength": 128
+        },
+        "email": {
+          "type": "string",
+          "description": "User email address",
+          "maxLength": 256
+        },
+        "displayName": {
+          "type": "string",
+          "description": "User display name",
+          "maxLength": 120
+        },
+        "role": {
+          "type": "string",
+          "description": "User role: freelancer or client",
+          "enum": ["freelancer", "client"],
+          "maxLength": 30
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "ISO timestamp of account creation",
+          "maxLength": 64
+        }
+      },
+      "required": ["id", "email", "role"]
+    },
+    "FileRecord": {
+      "title": "File Record",
+      "description": "Uploaded file metadata and content in ClientVault",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique file ID",
+          "maxLength": 128
+        },
+        "name": {
+          "type": "string",
+          "description": "Filename with extension",
+          "maxLength": 256
+        },
+        "size": {
+          "type": "integer",
+          "description": "File size in bytes"
+        },
+        "type": {
+          "type": "string",
+          "description": "MIME type or file extension category",
+          "maxLength": 128
+        },
+        "ownerId": {
+          "type": "string",
+          "description": "UID of user who owns or uploaded the file",
+          "maxLength": 128
+        },
+        "category": {
+          "type": "string",
+          "description": "File category grouping",
+          "enum": ["documents", "designs", "images", "contracts", "other"],
+          "maxLength": 50
+        },
+        "clientName": {
+          "type": "string",
+          "description": "Associated client or project name",
+          "maxLength": 120
+        },
+        "fileData": {
+          "type": "string",
+          "description": "Base64 data or data URL for fast direct download/preview",
+          "maxLength": 800000
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "ISO timestamp of upload",
+          "maxLength": 64
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "ISO timestamp of last update",
+          "maxLength": 64
+        }
+      },
+      "required": ["id", "name", "size", "ownerId", "createdAt"]
+    },
+    "ClientRecord": {
+      "title": "Client Portal Space",
+      "description": "Client profile or vault space managed by freelancer",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique client ID",
+          "maxLength": 128
+        },
+        "name": {
+          "type": "string",
+          "description": "Client or company name",
+          "maxLength": 120
+        },
+        "email": {
+          "type": "string",
+          "description": "Client contact email",
+          "maxLength": 256
+        },
+        "ownerId": {
+          "type": "string",
+          "description": "Freelancer UID who manages this client",
+          "maxLength": 128
+        },
+        "company": {
+          "type": "string",
+          "description": "Company or brand name",
+          "maxLength": 120
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "ISO timestamp of creation",
+          "maxLength": 64
+        }
+      },
+      "required": ["id", "name", "ownerId", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile documents keyed by Auth UID"
+    },
+    "/files/{fileId}": {
+      "schema": "FileRecord",
+      "description": "File metadata and uploaded items isolated per owner"
+    },
+    "/clients/{clientId}": {
+      "schema": "ClientRecord",
+      "description": "Client portals created by users"
+    }
+  }
+}

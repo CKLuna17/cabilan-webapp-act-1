@@ -1,0 +1,8 @@
+{
+  "name": "CVault",
+  "description": "Secure client file portal for freelancers and designers to manage client file uploads, storage, and access.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
