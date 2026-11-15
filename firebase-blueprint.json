@@ -2,147 +2,160 @@
   "entities": {
     "User": {
       "title": "User Profile",
-      "description": "User account information and role metadata",
+      "description": "User account information and portal role metadata",
       "type": "object",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "User UID",
-          "maxLength": 128
-        },
-        "email": {
-          "type": "string",
-          "description": "User email address",
-          "maxLength": 256
-        },
-        "displayName": {
-          "type": "string",
-          "description": "User display name",
-          "maxLength": 120
-        },
+        "id": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 256 },
+        "displayName": { "type": "string", "maxLength": 120 },
         "role": {
           "type": "string",
-          "description": "User role: freelancer or client",
-          "enum": ["freelancer", "client"],
+          "enum": ["admin", "professor", "student", "freelancer", "client"],
           "maxLength": 30
         },
-        "createdAt": {
-          "type": "string",
-          "description": "ISO timestamp of account creation",
-          "maxLength": 64
-        }
+        "department": { "type": "string", "maxLength": 120 },
+        "studentCode": { "type": "string", "maxLength": 32 },
+        "photoDataUrl": { "type": "string", "maxLength": 150000 },
+        "createdAt": { "type": "string", "maxLength": 64 }
       },
       "required": ["id", "email", "role"]
     },
-    "FileRecord": {
-      "title": "File Record",
-      "description": "Uploaded file metadata and content in ClientVault",
+    "DirectoryEntry": {
+      "title": "Campus Directory Entry",
+      "description": "Non-PII campus roster record",
       "type": "object",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique file ID",
-          "maxLength": 128
-        },
-        "name": {
-          "type": "string",
-          "description": "Filename with extension",
-          "maxLength": 256
-        },
-        "size": {
-          "type": "integer",
-          "description": "File size in bytes"
-        },
-        "type": {
-          "type": "string",
-          "description": "MIME type or file extension category",
-          "maxLength": 128
-        },
-        "ownerId": {
-          "type": "string",
-          "description": "UID of user who owns or uploaded the file",
-          "maxLength": 128
-        },
-        "category": {
-          "type": "string",
-          "description": "File category grouping",
-          "enum": ["documents", "designs", "images", "contracts", "other"],
-          "maxLength": 50
-        },
-        "clientName": {
-          "type": "string",
-          "description": "Associated client or project name",
-          "maxLength": 120
-        },
-        "fileData": {
-          "type": "string",
-          "description": "Base64 data or data URL for fast direct download/preview",
-          "maxLength": 800000
-        },
-        "createdAt": {
-          "type": "string",
-          "description": "ISO timestamp of upload",
-          "maxLength": 64
-        },
-        "updatedAt": {
-          "type": "string",
-          "description": "ISO timestamp of last update",
-          "maxLength": 64
-        }
+        "id": { "type": "string", "maxLength": 128 },
+        "displayName": { "type": "string", "maxLength": 120 },
+        "role": { "type": "string", "enum": ["admin", "professor", "student"], "maxLength": 30 },
+        "department": { "type": "string", "maxLength": 120 },
+        "studentCode": { "type": "string", "maxLength": 32 },
+        "campusScope": { "type": "string", "maxLength": 32 },
+        "updatedAt": { "type": "string", "maxLength": 64 }
       },
-      "required": ["id", "name", "size", "ownerId", "createdAt"]
+      "required": ["id", "displayName", "role", "campusScope"]
     },
-    "ClientRecord": {
-      "title": "Client Portal Space",
-      "description": "Client profile or vault space managed by freelancer",
+    "Course": {
+      "title": "Academic Course",
+      "description": "Course schedule, room, building, and assigned professor",
       "type": "object",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique client ID",
-          "maxLength": 128
-        },
-        "name": {
-          "type": "string",
-          "description": "Client or company name",
-          "maxLength": 120
-        },
-        "email": {
-          "type": "string",
-          "description": "Client contact email",
-          "maxLength": 256
-        },
-        "ownerId": {
-          "type": "string",
-          "description": "Freelancer UID who manages this client",
-          "maxLength": 128
-        },
-        "company": {
-          "type": "string",
-          "description": "Company or brand name",
-          "maxLength": 120
-        },
-        "createdAt": {
-          "type": "string",
-          "description": "ISO timestamp of creation",
-          "maxLength": 64
-        }
+        "id": { "type": "string", "maxLength": 128 },
+        "code": { "type": "string", "maxLength": 24 },
+        "title": { "type": "string", "maxLength": 140 },
+        "department": { "type": "string", "maxLength": 100 },
+        "instructorId": { "type": "string", "maxLength": 128 },
+        "instructorName": { "type": "string", "maxLength": 120 },
+        "room": { "type": "string", "maxLength": 60 },
+        "building": { "type": "string", "maxLength": 80 },
+        "scheduleDays": { "type": "string", "maxLength": 60 },
+        "startTime": { "type": "string", "maxLength": 20 },
+        "endTime": { "type": "string", "maxLength": 20 },
+        "capacity": { "type": "integer" },
+        "enrolledCount": { "type": "integer" },
+        "status": { "type": "string", "enum": ["active", "archived"], "maxLength": 24 },
+        "campusScope": { "type": "string", "maxLength": 32 },
+        "createdBy": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "maxLength": 64 }
       },
-      "required": ["id", "name", "ownerId", "createdAt"]
+      "required": ["id", "code", "title", "instructorId", "room", "building", "startTime", "endTime", "status", "campusScope", "createdBy", "createdAt"]
+    },
+    "ClassSession": {
+      "title": "Class Session",
+      "description": "Scheduled or active class session with room and check-in code",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "courseId": { "type": "string", "maxLength": 128 },
+        "courseCode": { "type": "string", "maxLength": 24 },
+        "courseTitle": { "type": "string", "maxLength": 140 },
+        "professorId": { "type": "string", "maxLength": 128 },
+        "professorName": { "type": "string", "maxLength": 120 },
+        "room": { "type": "string", "maxLength": 60 },
+        "building": { "type": "string", "maxLength": 80 },
+        "sessionDate": { "type": "string", "maxLength": 32 },
+        "startTime": { "type": "string", "maxLength": 20 },
+        "endTime": { "type": "string", "maxLength": 20 },
+        "checkInCode": { "type": "string", "maxLength": 16 },
+        "status": { "type": "string", "enum": ["scheduled", "active", "completed"], "maxLength": 24 },
+        "campusScope": { "type": "string", "maxLength": 32 },
+        "createdBy": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "courseId", "courseCode", "courseTitle", "professorId", "room", "building", "sessionDate", "startTime", "endTime", "checkInCode", "status", "campusScope", "createdBy", "createdAt"]
+    },
+    "AttendanceRecord": {
+      "title": "Attendance Record",
+      "description": "Student check-in and QR scan record for a class session",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "sessionId": { "type": "string", "maxLength": 128 },
+        "courseId": { "type": "string", "maxLength": 128 },
+        "courseCode": { "type": "string", "maxLength": 24 },
+        "courseTitle": { "type": "string", "maxLength": 140 },
+        "studentId": { "type": "string", "maxLength": 128 },
+        "studentName": { "type": "string", "maxLength": 120 },
+        "professorId": { "type": "string", "maxLength": 128 },
+        "room": { "type": "string", "maxLength": 60 },
+        "building": { "type": "string", "maxLength": 80 },
+        "sessionDate": { "type": "string", "maxLength": 32 },
+        "scanMethod": { "type": "string", "enum": ["qr", "code", "manual"], "maxLength": 16 },
+        "status": { "type": "string", "enum": ["present", "late", "absent", "excused"], "maxLength": 24 },
+        "checkedInAt": { "type": "string", "maxLength": 64 },
+        "campusScope": { "type": "string", "maxLength": 32 },
+        "createdBy": { "type": "string", "maxLength": 128 }
+      },
+      "required": ["id", "sessionId", "courseId", "courseCode", "studentId", "studentName", "professorId", "status", "checkedInAt", "campusScope", "createdBy"]
+    },
+    "Announcement": {
+      "title": "Campus or Subject Announcement",
+      "description": "Official school-wide announcements posted by Admin or subject-specific announcements posted by Professor",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 140 },
+        "message": { "type": "string", "maxLength": 2000 },
+        "scope": { "type": "string", "enum": ["official", "subject"], "maxLength": 24 },
+        "courseId": { "type": "string", "maxLength": 128 },
+        "courseCode": { "type": "string", "maxLength": 24 },
+        "courseTitle": { "type": "string", "maxLength": 140 },
+        "activityDate": { "type": "string", "maxLength": 32 },
+        "photoCount": { "type": "integer" },
+        "authorId": { "type": "string", "maxLength": 128 },
+        "authorName": { "type": "string", "maxLength": 120 },
+        "authorRole": { "type": "string", "enum": ["admin", "professor"], "maxLength": 24 },
+        "campusScope": { "type": "string", "maxLength": 32 },
+        "createdAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "title", "message", "scope", "courseId", "courseCode", "authorId", "authorName", "authorRole", "campusScope", "createdAt"]
+    },
+    "AnnouncementPhoto": {
+      "title": "Announcement Photo Attachment",
+      "description": "Validated image attachment (500 KB - 3 MB original, max 4 per announcement)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "announcementId": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 256 },
+        "mimeType": { "type": "string", "maxLength": 64 },
+        "sizeBytes": { "type": "integer" },
+        "orderIndex": { "type": "integer" },
+        "dataUrl": { "type": "string", "maxLength": 550000 },
+        "authorId": { "type": "string", "maxLength": 128 },
+        "campusScope": { "type": "string", "maxLength": 32 },
+        "createdAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "announcementId", "name", "mimeType", "sizeBytes", "orderIndex", "dataUrl", "authorId", "campusScope", "createdAt"]
     }
   },
   "firestore": {
-    "/users/{userId}": {
-      "schema": "User",
-      "description": "User profile documents keyed by Auth UID"
-    },
-    "/files/{fileId}": {
-      "schema": "FileRecord",
-      "description": "File metadata and uploaded items isolated per owner"
-    },
-    "/clients/{clientId}": {
-      "schema": "ClientRecord",
-      "description": "Client portals created by users"
-    }
+    "/users/{userId}": { "schema": "User", "description": "Private user profiles" },
+    "/directory/{userId}": { "schema": "DirectoryEntry", "description": "Non-PII campus roster" },
+    "/courses/{courseId}": { "schema": "Course", "description": "Academic courses and room schedules" },
+    "/sessions/{sessionId}": { "schema": "ClassSession", "description": "Scheduled and active sessions" },
+    "/attendance/{recordId}": { "schema": "AttendanceRecord", "description": "Student attendance and QR scan records" },
+    "/announcements/{announcementId}": { "schema": "Announcement", "description": "Official Admin and Professor subject announcements" },
+    "/announcementPhotos/{photoId}": { "schema": "AnnouncementPhoto", "description": "Validated photo attachments for official announcements" }
   }
 }

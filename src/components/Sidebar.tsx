@@ -1,174 +1,249 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
-import { 
-  Shield, 
-  Files, 
-  UploadCloud, 
-  Users, 
-  Share2, 
-  LogOut, 
-  HardDrive,
-  ExternalLink,
-  ChevronRight
+import {
+  LayoutDashboard,
+  DoorOpen,
+  Megaphone,
+  BookOpen,
+  CalendarClock,
+  CheckSquare,
+  CalendarDays,
+  QrCode,
+  LogOut,
+  ShieldCheck,
+  BookOpenCheck,
+  GraduationCap,
+  X,
 } from 'lucide-react';
+import { AttendlyLogo } from './AttendlyLogo';
+import { UserRole } from '../types/attendly';
+
+export type DashboardTab =
+  | 'overview'
+  | 'rooms'
+  | 'announcements'
+  | 'courses'
+  | 'schedule'
+  | 'attendance'
+  | 'calendar'
+  | 'qrpass';
 
 interface SidebarProps {
-  currentTab: 'files' | 'upload' | 'clients' | 'share';
-  setCurrentTab: (tab: 'files' | 'upload' | 'clients' | 'share') => void;
-  totalFilesCount: number;
-  totalStorageBytes: number;
-  openShareModal: () => void;
+  activeRole: UserRole;
+  onSelectViewRole: (role: UserRole) => void;
+  activeTab: DashboardTab;
+  setActiveTab: (tab: DashboardTab) => void;
+  activeSessionCount: number;
+  coursesCount: number;
+  announcementsCount: number;
+  unreadAnnouncementsCount: number;
+  mobileOpen: boolean;
+  onCloseMobile: () => void;
+}
+
+interface NavItem {
+  id: DashboardTab;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  count?: number;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
-  currentTab,
-  setCurrentTab,
-  totalFilesCount,
-  totalStorageBytes,
-  openShareModal
+  activeRole,
+  onSelectViewRole,
+  activeTab,
+  setActiveTab,
+  activeSessionCount,
+  coursesCount,
+  announcementsCount,
+  unreadAnnouncementsCount,
+  mobileOpen,
+  onCloseMobile,
 }) => {
   const { user, userProfile, signOutUser } = useAuth();
 
-  // 100 MB free tier storage limit representation
-  const maxStorageBytes = 100 * 1024 * 1024;
-  const storagePercentage = Math.min(100, Math.round((totalStorageBytes / maxStorageBytes) * 100));
-
-  const formatSize = (bytes: number) => {
-    if (bytes === 0) return '0 MB';
-    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  const navByRole: Record<UserRole, NavItem[]> = {
+    admin: [
+      { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+      { id: 'rooms', label: 'Room Usage', icon: DoorOpen, count: coursesCount },
+      { id: 'announcements', label: 'Official Announcements', icon: Megaphone, count: announcementsCount },
+      { id: 'courses', label: 'Courses & Sessions', icon: BookOpen, count: activeSessionCount },
+    ],
+    professor: [
+      { id: 'schedule', label: 'Schedule & QR Scan', icon: CalendarClock, count: activeSessionCount },
+      { id: 'attendance', label: 'Subject Attendance', icon: CheckSquare, count: coursesCount },
+      { id: 'announcements', label: 'Subject Announcements', icon: Megaphone, count: announcementsCount },
+    ],
+    student: [
+      { id: 'calendar', label: 'Schedule Calendar', icon: CalendarDays, count: coursesCount },
+      { id: 'qrpass', label: 'My Student QR', icon: QrCode },
+      {
+        id: 'announcements',
+        label: 'Announcements',
+        icon: Megaphone,
+        count: unreadAnnouncementsCount > 0 ? unreadAnnouncementsCount : announcementsCount,
+      },
+    ],
   };
 
-  interface NavItem {
-    id: 'files' | 'upload' | 'clients';
-    label: string;
-    icon: React.ComponentType<{ className?: string }>;
-    badge?: number;
-  }
+  const navItems = navByRole[activeRole];
 
-  const navItems: NavItem[] = [
-    { id: 'files', label: 'All Files', icon: Files, badge: totalFilesCount },
-    { id: 'upload', label: 'Upload Files', icon: UploadCloud },
-    { id: 'clients', label: 'Client Spaces', icon: Users },
+  const roleSwitcherOptions: { id: UserRole; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+    { id: 'admin', label: 'Admin', icon: ShieldCheck },
+    { id: 'professor', label: 'Professor', icon: BookOpenCheck },
+    { id: 'student', label: 'Student', icon: GraduationCap },
   ];
 
-  return (
-    <aside className="w-64 bg-slate-950/50 backdrop-blur-3xl text-slate-200 flex flex-col justify-between shrink-0 h-screen sticky top-0 border-r border-white/15 z-20 select-none shadow-2xl">
+  const roleTitle = activeRole === 'admin' ? 'Admin' : activeRole === 'professor' ? 'Professor' : 'Student';
+
+  const sidebarContent = (
+    <div className="flex flex-col justify-between h-full">
       <div>
-        {/* Brand Header */}
-        <div className="p-6 border-b border-white/10">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-white/15 border border-white/30 backdrop-blur-md flex items-center justify-center shadow-lg shadow-blue-900/30">
-              <Shield className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <div className="text-xl font-extrabold tracking-tight text-white flex items-center gap-2 drop-shadow-2xs">
-                ClientVault
+        {/* Brand Header with School Tracking Logo */}
+        <div className="p-5 sm:p-6 border-b border-white/10 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-3 min-w-0">
+            <AttendlyLogo size="sm" showGlow={false} />
+            <div className="min-w-0">
+              <div className="text-xl font-extrabold tracking-tight text-white truncate drop-shadow-2xs">
+                Attendly
               </div>
-              <p className="text-[11px] text-white/70 font-medium">Client File Portal</p>
+              <p className="text-[11px] text-white/75 font-medium truncate">
+                Know where to be and when.
+              </p>
             </div>
           </div>
+
+          <button
+            type="button"
+            onClick={onCloseMobile}
+            aria-label="Close navigation menu"
+            className="lg:hidden p-2 text-white/80 hover:text-white hover:bg-white/10 rounded-xl transition cursor-pointer"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
-        {/* Primary Navigation */}
+        {/* Navigation */}
         <nav className="p-4 space-y-1.5">
-          <div className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-wider text-white/50">
-            Workspace
+          <div className="px-3 pb-2 text-[11px] font-semibold tracking-wide text-white/55">
+            {roleTitle} Dashboard
           </div>
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isActive = currentTab === item.id;
+            const isActive = activeTab === item.id;
             return (
               <button
                 key={item.id}
-                onClick={() => setCurrentTab(item.id)}
-                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium transition cursor-pointer backdrop-blur-xs ${
+                onClick={() => {
+                  setActiveTab(item.id);
+                  onCloseMobile();
+                }}
+                className={`w-full flex items-center justify-between px-3.5 py-2.5 min-h-[44px] rounded-xl text-sm font-medium transition cursor-pointer backdrop-blur-xs whitespace-nowrap ${
                   isActive
                     ? 'bg-blue-600/85 text-white shadow-lg shadow-blue-600/30 border border-white/25 font-semibold'
                     : 'text-white/80 hover:bg-white/10 hover:text-white'
                 }`}
               >
-                <div className="flex items-center gap-3">
-                  <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-white/70'}`} />
-                  <span>{item.label}</span>
+                <div className="flex items-center gap-3 min-w-0">
+                  <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-white/70'}`} />
+                  <span className="truncate">{item.label}</span>
                 </div>
-                {item.badge !== undefined && (
+                {item.count !== undefined && (
                   <span
-                    className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
-                      isActive ? 'bg-blue-700/80 text-white' : 'bg-white/15 text-white/80 border border-white/10'
+                    className={`text-xs font-mono tabular-nums shrink-0 ${
+                      item.id === 'announcements' && activeRole === 'student' && unreadAnnouncementsCount > 0
+                        ? 'bg-rose-500 text-white px-1.5 py-0.5 rounded-full font-bold'
+                        : 'text-white/75'
                     }`}
                   >
-                    {item.badge}
+                    {item.count}
                   </span>
                 )}
               </button>
             );
           })}
-
-          {/* Quick Client Portal Share Button */}
-          <div className="pt-4">
-            <button
-              onClick={openShareModal}
-              className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium text-emerald-200 bg-emerald-500/20 backdrop-blur-md border border-emerald-400/30 hover:bg-emerald-500/30 transition cursor-pointer shadow-xs"
-            >
-              <div className="flex items-center gap-3">
-                <Share2 className="w-4 h-4 text-emerald-300" />
-                <span>Share Client Link</span>
-              </div>
-              <ChevronRight className="w-3.5 h-3.5 text-emerald-300" />
-            </button>
-          </div>
         </nav>
       </div>
 
-      {/* Bottom Section: Storage & User Info */}
-      <div className="p-4 space-y-4 border-t border-white/10">
-        {/* Storage Usage Widget */}
-        <div className="p-3 bg-white/10 backdrop-blur-md rounded-2xl border border-white/15 shadow-xs">
-          <div className="flex items-center justify-between text-xs text-white/80 mb-1.5">
-            <span className="flex items-center gap-1.5 font-medium text-white">
-              <HardDrive className="w-3.5 h-3.5 text-blue-300" />
-              Storage Used
-            </span>
-            <span className="font-semibold text-white">
-              {formatSize(totalStorageBytes)}
-            </span>
-          </div>
-          <div className="w-full bg-white/15 h-1.5 rounded-full overflow-hidden">
-            <div
-              className="bg-gradient-to-r from-blue-400 to-indigo-400 h-full rounded-full transition-all duration-500"
-              style={{ width: `${Math.max(5, storagePercentage)}%` }}
-            />
-          </div>
-          <div className="flex justify-between items-center text-[10px] text-white/60 mt-1">
-            <span>{totalFilesCount} files stored</span>
-            <span>100 MB free plan</span>
+      {/* Bottom Portal View Switcher & User Info */}
+      <div className="p-4 space-y-3 border-t border-white/10">
+        <div className="p-2.5 bg-white/10 backdrop-blur-md rounded-2xl border border-white/15">
+          <p className="text-[11px] font-semibold text-white/70 px-1 mb-2">
+            Dashboard View
+          </p>
+          <div className="grid grid-cols-3 gap-1">
+            {roleSwitcherOptions.map((opt) => {
+              const Icon = opt.icon;
+              const selected = activeRole === opt.id;
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => {
+                    onSelectViewRole(opt.id);
+                    onCloseMobile();
+                  }}
+                  className={`py-2 px-1 min-h-[42px] rounded-lg text-[11px] font-semibold flex flex-col items-center justify-center gap-0.5 transition cursor-pointer whitespace-nowrap ${
+                    selected
+                      ? 'bg-white text-slate-900 shadow-sm'
+                      : 'text-white/75 hover:bg-white/10 hover:text-white'
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  <span>{opt.label}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
 
         {/* User Profile Bar */}
-        <div className="pt-2 flex items-center justify-between">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-blue-500 to-indigo-500 text-white font-semibold flex items-center justify-center shrink-0 text-xs shadow-inner uppercase border border-white/30">
+        <div className="pt-1 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-blue-500 to-indigo-500 text-white font-semibold flex items-center justify-center shrink-0 text-xs uppercase border border-white/30">
               {(userProfile?.displayName || user?.email || 'U')[0]}
             </div>
             <div className="min-w-0">
               <p className="text-xs font-semibold text-white truncate">
-                {userProfile?.displayName || 'Vault Member'}
+                {userProfile?.displayName || 'Attendly Member'}
               </p>
               <p className="text-[11px] text-white/70 truncate">
-                {user?.email || 'Authenticated User'}
+                {roleTitle} · {userProfile?.department || 'Campus'}
               </p>
             </div>
           </div>
           <button
             onClick={() => signOutUser()}
             title="Sign Out"
-            className="p-2 text-white/70 hover:text-rose-300 hover:bg-white/10 rounded-xl transition shrink-0 cursor-pointer"
+            className="p-2.5 text-white/70 hover:text-rose-300 hover:bg-white/10 rounded-xl transition shrink-0 cursor-pointer"
           >
             <LogOut className="w-4 h-4" />
           </button>
         </div>
       </div>
-    </aside>
+    </div>
+  );
+
+  return (
+    <>
+      {/* Desktop Sticky Sidebar */}
+      <aside className="hidden lg:flex w-64 bg-slate-950/55 backdrop-blur-3xl text-slate-200 flex-col shrink-0 h-screen sticky top-0 border-r border-white/15 z-20 select-none shadow-2xl">
+        {sidebarContent}
+      </aside>
+
+      {/* Mobile & Tablet Slide-Over Drawer */}
+      {mobileOpen && (
+        <div className="lg:hidden fixed inset-0 z-50 flex">
+          <div
+            className="fixed inset-0 bg-slate-950/55 backdrop-blur-sm"
+            onClick={onCloseMobile}
+            aria-hidden="true"
+          />
+          <aside className="relative w-72 max-w-[85vw] bg-slate-950/80 backdrop-blur-3xl text-slate-200 flex flex-col h-[100dvh] border-r border-white/20 z-10 select-none shadow-2xl overflow-y-auto">
+            {sidebarContent}
+          </aside>
+        </div>
+      )}
+    </>
   );
 };

@@ -1,17 +1,14 @@
 import React, { useState } from 'react';
 import { 
-  Shield, 
-  UploadCloud, 
   FileText, 
-  CheckCircle2, 
   Download, 
   Trash2, 
   ArrowLeft, 
-  Lock, 
   ShieldCheck 
 } from 'lucide-react';
 import { StoredFileRecord, formatFileSize, downloadFileRecord } from '../lib/storage';
 import { FileUploadArea } from './FileUploadArea';
+import { AttendlyLogo } from './AttendlyLogo';
 
 interface ClientPortalViewProps {
   clientName: string;
@@ -41,17 +38,15 @@ export const ClientPortalView: React.FC<ClientPortalViewProps> = ({
       {/* Frosted Top Navigation Bar */}
       <header className="bg-slate-950/60 backdrop-blur-2xl text-white px-6 py-4 border-b border-white/15 flex items-center justify-between sticky top-0 z-20 shadow-lg">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-white/15 border border-white/30 backdrop-blur-md flex items-center justify-center shadow-lg shadow-blue-900/30">
-            <Shield className="w-5 h-5 text-white" />
-          </div>
+          <AttendlyLogo size="sm" showGlow={false} />
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-extrabold text-sm tracking-tight text-white drop-shadow-2xs">ClientVault</span>
+              <span className="font-extrabold text-sm tracking-tight text-white drop-shadow-2xs">Attendly</span>
               <span className="text-[10px] bg-white/20 text-white px-2 py-0.5 rounded-full border border-white/30 font-semibold uppercase backdrop-blur-xs">
-                Client Upload Space
+                Student Tracker Portal
               </span>
             </div>
-            <p className="text-[11px] text-white/70 font-medium">Secured with 256-bit encryption</p>
+            <p className="text-[11px] text-white/70 font-medium">Know where to be and when.</p>
           </div>
         </div>
 
@@ -163,8 +158,8 @@ export const ClientPortalView: React.FC<ClientPortalViewProps> = ({
       </main>
 
       {/* Footer */}
-      <footer className="text-center py-6 text-xs text-slate-400 border-t border-slate-200 bg-white">
-        Protected by ClientVault • Secure Client Collaboration Portal
+      <footer className="text-center py-6 text-xs text-slate-700 font-medium border-t border-white/40 bg-white/40 backdrop-blur-md relative z-10">
+        Protected by Attendly • Student Tracker Portal
       </footer>
     </div>
   );

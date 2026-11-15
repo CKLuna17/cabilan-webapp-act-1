@@ -2,7 +2,7 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    
+
     // Global Default Deny
     match /{document=**} {
       allow read, write: if false;
@@ -29,31 +29,260 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    function userRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isBootstrappedAdmin() {
+      return isSignedIn()
+        && request.auth.token.email == 'chriskate.luna@gmail.com'
+        && request.auth.token.email_verified == true;
+    }
+
+    function isAdminRole() {
+      return isBootstrappedAdmin()
+        || (isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && userRole() == 'admin');
+    }
+
+    function isProfessorRole() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && (userRole() == 'professor' || userRole() == 'freelancer');
+    }
+
     // Connection health check document
     match /test/{testId} {
       allow read: if true;
     }
 
-    // User profile documents
+    // Private User profile documents (PII isolated to owner)
     match /users/{userId} {
       function isValidUser(data) {
-        return data.id == userId
-          && data.id is string && data.id.size() <= 128
+        return data.keys().hasAll(['id', 'email', 'role'])
+          && data.keys().hasOnly(['id', 'email', 'displayName', 'role', 'department', 'studentCode', 'photoDataUrl', 'createdAt'])
+          && data.id == userId
+          && isValidId(data.id)
           && data.email is string && data.email.size() <= 256
           && (!('displayName' in data) || (data.displayName is string && data.displayName.size() <= 120))
-          && (!('role' in data) || (data.role in ['freelancer', 'client']))
+          && data.role in ['admin', 'professor', 'student', 'freelancer', 'client']
+          && (!('department' in data) || (data.department is string && data.department.size() <= 120))
+          && (!('studentCode' in data) || (data.studentCode is string && data.studentCode.size() <= 32))
+          && (!('photoDataUrl' in data) || (data.photoDataUrl is string && data.photoDataUrl.size() <= 150000))
           && (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 64));
       }
 
-      allow get: if isOwner(userId);
-      allow create: if isOwner(userId) && isValidUser(incoming());
-      allow update: if isOwner(userId) && isValidUser(incoming())
+      allow get: if isOwner(userId) || isAdminRole();
+      allow create: if isOwner(userId) && isValidId(userId) && isValidUser(incoming());
+      allow update: if isOwner(userId) && isValidId(userId) && isValidUser(incoming())
         && incoming().id == existing().id
-        && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'role', 'email']);
-      allow delete: if isOwner(userId);
+        && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'role', 'email', 'department', 'studentCode', 'photoDataUrl']);
+      allow delete: if isOwner(userId) && isValidId(userId);
     }
 
-    // File records
+    // Non-PII Campus Directory
+    match /directory/{userId} {
+      function isValidDirectoryEntry(data) {
+        return data.keys().hasAll(['id', 'displayName', 'role', 'campusScope'])
+          && data.keys().hasOnly(['id', 'displayName', 'role', 'department', 'studentCode', 'campusScope', 'updatedAt'])
+          && data.id == userId
+          && isValidId(data.id)
+          && data.displayName is string && data.displayName.size() > 0 && data.displayName.size() <= 120
+          && data.role in ['admin', 'professor', 'student']
+          && (!('department' in data) || (data.department is string && data.department.size() <= 120))
+          && (!('studentCode' in data) || (data.studentCode is string && data.studentCode.size() <= 32))
+          && data.campusScope == 'attendly'
+          && (!('updatedAt' in data) || (data.updatedAt is string && data.updatedAt.size() <= 64));
+      }
+
+      allow get: if isSignedIn() && isValidId(userId);
+      allow list: if isSignedIn() && resource.data.campusScope == 'attendly';
+      allow create: if isOwner(userId) && isValidId(userId) && isValidDirectoryEntry(incoming());
+      allow update: if isOwner(userId) && isValidId(userId) && isValidDirectoryEntry(incoming())
+        && incoming().id == existing().id
+        && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'role', 'department', 'studentCode', 'updatedAt']);
+      allow delete: if isOwner(userId) && isValidId(userId);
+    }
+
+    // Academic Courses & Room Schedules
+    match /courses/{courseId} {
+      function isValidCourse(data) {
+        return data.keys().hasAll(['id', 'code', 'title', 'instructorId', 'room', 'building', 'startTime', 'endTime', 'status', 'campusScope', 'createdBy', 'createdAt'])
+          && data.keys().hasOnly(['id', 'code', 'title', 'department', 'instructorId', 'instructorName', 'room', 'building', 'scheduleDays', 'startTime', 'endTime', 'capacity', 'enrolledCount', 'status', 'campusScope', 'createdBy', 'createdAt'])
+          && isValidId(data.id)
+          && data.id == courseId
+          && data.code is string && data.code.size() > 0 && data.code.size() <= 24
+          && data.title is string && data.title.size() > 0 && data.title.size() <= 140
+          && (!('department' in data) || (data.department is string && data.department.size() <= 100))
+          && isValidId(data.instructorId)
+          && (!('instructorName' in data) || (data.instructorName is string && data.instructorName.size() <= 120))
+          && data.room is string && data.room.size() > 0 && data.room.size() <= 60
+          && data.building is string && data.building.size() > 0 && data.building.size() <= 80
+          && (!('scheduleDays' in data) || (data.scheduleDays is string && data.scheduleDays.size() <= 60))
+          && data.startTime is string && data.startTime.size() > 0 && data.startTime.size() <= 20
+          && data.endTime is string && data.endTime.size() > 0 && data.endTime.size() <= 20
+          && (!('capacity' in data) || (data.capacity is int && data.capacity >= 1 && data.capacity <= 1000))
+          && (!('enrolledCount' in data) || (data.enrolledCount is int && data.enrolledCount >= 0 && data.enrolledCount <= 1000))
+          && data.status in ['active', 'archived']
+          && data.campusScope == 'attendly'
+          && isValidId(data.createdBy)
+          && data.createdAt is string && data.createdAt.size() <= 64;
+      }
+
+      allow get: if isSignedIn() && isValidId(courseId);
+      allow list: if isSignedIn() && resource.data.campusScope == 'attendly';
+      allow create: if isSignedIn() && isValidId(courseId) && isValidCourse(incoming())
+        && incoming().createdBy == request.auth.uid
+        && (isAdminRole() || isProfessorRole());
+      allow update: if isSignedIn() && isValidId(courseId) && isValidCourse(incoming())
+        && incoming().createdBy == existing().createdBy
+        && (isAdminRole() || (isProfessorRole() && (existing().instructorId == request.auth.uid || existing().createdBy == request.auth.uid)))
+        && incoming().diff(existing()).affectedKeys().hasOnly(['code', 'title', 'department', 'instructorId', 'instructorName', 'room', 'building', 'scheduleDays', 'startTime', 'endTime', 'capacity', 'enrolledCount', 'status']);
+      allow delete: if isSignedIn() && isValidId(courseId)
+        && (isAdminRole() || (isProfessorRole() && (existing().instructorId == request.auth.uid || existing().createdBy == request.auth.uid)));
+    }
+
+    // Class Sessions
+    match /sessions/{sessionId} {
+      function isValidSession(data) {
+        return data.keys().hasAll(['id', 'courseId', 'courseCode', 'courseTitle', 'professorId', 'room', 'building', 'sessionDate', 'startTime', 'endTime', 'checkInCode', 'status', 'campusScope', 'createdBy', 'createdAt'])
+          && data.keys().hasOnly(['id', 'courseId', 'courseCode', 'courseTitle', 'professorId', 'professorName', 'room', 'building', 'sessionDate', 'startTime', 'endTime', 'checkInCode', 'status', 'campusScope', 'createdBy', 'createdAt'])
+          && isValidId(data.id)
+          && data.id == sessionId
+          && isValidId(data.courseId)
+          && data.courseCode is string && data.courseCode.size() > 0 && data.courseCode.size() <= 24
+          && data.courseTitle is string && data.courseTitle.size() > 0 && data.courseTitle.size() <= 140
+          && isValidId(data.professorId)
+          && (!('professorName' in data) || (data.professorName is string && data.professorName.size() <= 120))
+          && data.room is string && data.room.size() > 0 && data.room.size() <= 60
+          && data.building is string && data.building.size() > 0 && data.building.size() <= 80
+          && data.sessionDate is string && data.sessionDate.size() > 0 && data.sessionDate.size() <= 32
+          && data.startTime is string && data.startTime.size() > 0 && data.startTime.size() <= 20
+          && data.endTime is string && data.endTime.size() > 0 && data.endTime.size() <= 20
+          && data.checkInCode is string && data.checkInCode.size() > 0 && data.checkInCode.size() <= 16
+          && data.status in ['scheduled', 'active', 'completed']
+          && data.campusScope == 'attendly'
+          && isValidId(data.createdBy)
+          && data.createdAt is string && data.createdAt.size() <= 64;
+      }
+
+      allow get: if isSignedIn() && isValidId(sessionId);
+      allow list: if isSignedIn() && resource.data.campusScope == 'attendly';
+      allow create: if isSignedIn() && isValidId(sessionId) && isValidSession(incoming())
+        && incoming().createdBy == request.auth.uid
+        && (isAdminRole() || isProfessorRole());
+      allow update: if isSignedIn() && isValidId(sessionId) && isValidSession(incoming())
+        && incoming().createdBy == existing().createdBy
+        && (isAdminRole() || (isProfessorRole() && (existing().professorId == request.auth.uid || existing().createdBy == request.auth.uid)))
+        && incoming().diff(existing()).affectedKeys().hasOnly(['room', 'building', 'sessionDate', 'startTime', 'endTime', 'checkInCode', 'status']);
+      allow delete: if isSignedIn() && isValidId(sessionId)
+        && (isAdminRole() || (isProfessorRole() && (existing().professorId == request.auth.uid || existing().createdBy == request.auth.uid)));
+    }
+
+    // Student Attendance & QR Scan Records
+    match /attendance/{recordId} {
+      function isValidAttendance(data) {
+        return data.keys().hasAll(['id', 'sessionId', 'courseId', 'courseCode', 'studentId', 'studentName', 'professorId', 'status', 'checkedInAt', 'campusScope', 'createdBy'])
+          && data.keys().hasOnly(['id', 'sessionId', 'courseId', 'courseCode', 'courseTitle', 'studentId', 'studentName', 'professorId', 'room', 'building', 'sessionDate', 'scanMethod', 'status', 'checkedInAt', 'campusScope', 'createdBy'])
+          && isValidId(data.id)
+          && data.id == recordId
+          && isValidId(data.sessionId)
+          && isValidId(data.courseId)
+          && data.courseCode is string && data.courseCode.size() > 0 && data.courseCode.size() <= 24
+          && (!('courseTitle' in data) || (data.courseTitle is string && data.courseTitle.size() <= 140))
+          && isValidId(data.studentId)
+          && data.studentName is string && data.studentName.size() > 0 && data.studentName.size() <= 120
+          && isValidId(data.professorId)
+          && (!('room' in data) || (data.room is string && data.room.size() <= 60))
+          && (!('building' in data) || (data.building is string && data.building.size() <= 80))
+          && (!('sessionDate' in data) || (data.sessionDate is string && data.sessionDate.size() <= 32))
+          && (!('scanMethod' in data) || (data.scanMethod in ['qr', 'code', 'manual']))
+          && data.status in ['present', 'late', 'absent', 'excused']
+          && data.checkedInAt is string && data.checkedInAt.size() <= 64
+          && data.campusScope == 'attendly'
+          && isValidId(data.createdBy);
+      }
+
+      allow get: if isSignedIn() && isValidId(recordId)
+        && (existing().studentId == request.auth.uid || existing().professorId == request.auth.uid || existing().createdBy == request.auth.uid || isAdminRole());
+      allow list: if isSignedIn()
+        && (resource.data.studentId == request.auth.uid || resource.data.professorId == request.auth.uid || resource.data.createdBy == request.auth.uid);
+      allow create: if isSignedIn() && isValidId(recordId) && isValidAttendance(incoming())
+        && incoming().createdBy == request.auth.uid
+        && (incoming().studentId == request.auth.uid || isProfessorRole() || isAdminRole());
+      allow update: if isSignedIn() && isValidId(recordId) && isValidAttendance(incoming())
+        && incoming().studentId == existing().studentId
+        && incoming().createdBy == existing().createdBy
+        && (isAdminRole() || (isProfessorRole() && (existing().professorId == request.auth.uid || existing().createdBy == request.auth.uid)))
+        && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'checkedInAt', 'scanMethod']);
+      allow delete: if isSignedIn() && isValidId(recordId)
+        && (isAdminRole() || (isProfessorRole() && (existing().professorId == request.auth.uid || existing().createdBy == request.auth.uid)));
+    }
+
+    // Official Admin & Subject-Specific Professor Announcements
+    match /announcements/{announcementId} {
+      function isValidAnnouncement(data) {
+        return data.keys().hasAll(['id', 'title', 'message', 'scope', 'courseId', 'courseCode', 'authorId', 'authorName', 'authorRole', 'campusScope', 'createdAt'])
+          && data.keys().hasOnly(['id', 'title', 'message', 'scope', 'courseId', 'courseCode', 'courseTitle', 'activityDate', 'photoCount', 'authorId', 'authorName', 'authorRole', 'campusScope', 'createdAt'])
+          && isValidId(data.id)
+          && data.id == announcementId
+          && data.title is string && data.title.size() > 0 && data.title.size() <= 140
+          && data.message is string && data.message.size() > 0 && data.message.size() <= 2000
+          && data.scope in ['official', 'subject']
+          && isValidId(data.courseId)
+          && data.courseCode is string && data.courseCode.size() > 0 && data.courseCode.size() <= 24
+          && (!('courseTitle' in data) || (data.courseTitle is string && data.courseTitle.size() <= 140))
+          && (!('activityDate' in data) || (data.activityDate is string && data.activityDate.size() <= 32))
+          && (!('photoCount' in data) || (data.photoCount is int && data.photoCount >= 0 && data.photoCount <= 4))
+          && isValidId(data.authorId)
+          && data.authorName is string && data.authorName.size() > 0 && data.authorName.size() <= 120
+          && data.authorRole in ['admin', 'professor']
+          && data.campusScope == 'attendly'
+          && data.createdAt is string && data.createdAt.size() <= 64;
+      }
+
+      allow get: if isSignedIn() && isValidId(announcementId);
+      allow list: if isSignedIn() && resource.data.campusScope == 'attendly';
+      allow create: if isSignedIn() && isValidId(announcementId) && isValidAnnouncement(incoming())
+        && incoming().authorId == request.auth.uid
+        && ((incoming().scope == 'official' && isAdminRole())
+          || (incoming().scope == 'subject' && (isProfessorRole() || isAdminRole())));
+      allow update: if isSignedIn() && isValidId(announcementId) && isValidAnnouncement(incoming())
+        && incoming().authorId == existing().authorId
+        && (isAdminRole() || existing().authorId == request.auth.uid)
+        && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'message', 'activityDate', 'photoCount']);
+      allow delete: if isSignedIn() && isValidId(announcementId)
+        && (isAdminRole() || existing().authorId == request.auth.uid);
+    }
+
+    // Validated Announcement Photo Attachments (Images only, max 4 per announcement, 500 KB - 3 MB)
+    match /announcementPhotos/{photoId} {
+      function isValidAnnouncementPhoto(data) {
+        return data.keys().hasAll(['id', 'announcementId', 'name', 'mimeType', 'sizeBytes', 'orderIndex', 'dataUrl', 'authorId', 'campusScope', 'createdAt'])
+          && data.keys().hasOnly(['id', 'announcementId', 'name', 'mimeType', 'sizeBytes', 'orderIndex', 'dataUrl', 'authorId', 'campusScope', 'createdAt'])
+          && isValidId(data.id)
+          && data.id == photoId
+          && isValidId(data.announcementId)
+          && data.name is string && data.name.size() > 0 && data.name.size() <= 256
+          && data.mimeType is string && data.mimeType.size() <= 64 && data.mimeType.matches('^image/.*$')
+          && data.sizeBytes is int && data.sizeBytes >= 500000 && data.sizeBytes <= 3145728
+          && data.orderIndex is int && data.orderIndex >= 0 && data.orderIndex <= 3
+          && data.dataUrl is string && data.dataUrl.size() > 0 && data.dataUrl.size() <= 550000
+          && isValidId(data.authorId)
+          && data.campusScope == 'attendly'
+          && data.createdAt is string && data.createdAt.size() <= 64;
+      }
+
+      allow get: if isSignedIn() && isValidId(photoId);
+      allow list: if isSignedIn() && resource.data.campusScope == 'attendly';
+      allow create: if isSignedIn() && isValidId(photoId) && isValidAnnouncementPhoto(incoming())
+        && incoming().authorId == request.auth.uid
+        && isAdminRole()
+        && exists(/databases/$(database)/documents/announcements/$(incoming().announcementId));
+      allow delete: if isSignedIn() && isValidId(photoId)
+        && (isAdminRole() || existing().authorId == request.auth.uid);
+    }
+
+    // Legacy File records
     match /files/{fileId} {
       function isValidFile(data) {
         return isValidId(data.id)
@@ -78,7 +307,7 @@ service cloud.firestore {
       allow delete: if isSignedIn() && isValidId(fileId) && existing().ownerId == request.auth.uid;
     }
 
-    // Client records / portal spaces
+    // Legacy Client records
     match /clients/{clientId} {
       function isValidClient(data) {
         return isValidId(data.id)
