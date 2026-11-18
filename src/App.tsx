@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ThemeProvider } from './context/ThemeContext';
 import { AuthPage } from './components/AuthPage';
 import { Sidebar, DashboardTab } from './components/Sidebar';
 import { AttendlyLogo } from './components/AttendlyLogo';
@@ -12,7 +13,7 @@ import { AdminDashboard } from './components/dashboards/AdminDashboard';
 import { ProfessorDashboard } from './components/dashboards/ProfessorDashboard';
 import { StudentDashboard } from './components/dashboards/StudentDashboard';
 import { db, handleFirestoreError, OperationType } from './lib/firebase';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, setDoc, updateDoc } from 'firebase/firestore';
 import {
   CourseRecord,
   ClassSessionRecord,
@@ -20,6 +21,8 @@ import {
   DirectoryEntry,
   AnnouncementRecord,
   AnnouncementPhotoRecord,
+  AnnouncementReactionRecord,
+  AccountRequestRecord,
   UserRole,
 } from './types/attendly';
 import { CheckCircle2 } from 'lucide-react';
@@ -31,25 +34,25 @@ function defaultTabForRole(role: UserRole): DashboardTab {
 }
 
 function Dashboard() {
-  const { user, userProfile, updateUserRole } = useAuth();
-  const persistedRole: UserRole = userProfile?.role || 'student';
+  const { user, userProfile } = useAuth();
+  const activeRole: UserRole = userProfile?.role || 'student';
 
-  const [viewRole, setViewRole] = useState<UserRole>(persistedRole);
-  const [activeTab, setActiveTab] = useState<DashboardTab>(() => defaultTabForRole(persistedRole));
-  const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
+  const [activeTab, setActiveTab] = useState<DashboardTab>(() => defaultTabForRole(activeRole));
+  const [profScannerOpen, setProfScannerOpen] = useState<boolean>(false);
   const [courses, setCourses] = useState<CourseRecord[]>([]);
   const [sessions, setSessions] = useState<ClassSessionRecord[]>([]);
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [directory, setDirectory] = useState<DirectoryEntry[]>([]);
+  const [accountRequests, setAccountRequests] = useState<AccountRequestRecord[]>([]);
   const [announcements, setAnnouncements] = useState<AnnouncementRecord[]>([]);
   const [announcementPhotos, setAnnouncementPhotos] = useState<AnnouncementPhotoRecord[]>([]);
+  const [reactions, setReactions] = useState<AnnouncementReactionRecord[]>([]);
   const [readAnnouncementIds, setReadAnnouncementIds] = useState<string[]>([]);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    setViewRole(persistedRole);
-    setActiveTab(defaultTabForRole(persistedRole));
-  }, [persistedRole]);
+    setActiveTab(defaultTabForRole(activeRole));
+  }, [activeRole]);
 
   useEffect(() => {
     if (!user) {
@@ -96,15 +99,43 @@ function Dashboard() {
     setTimeout(() => setToastMessage(null), 3200);
   };
 
-  const handleSelectViewRole = async (nextRole: UserRole) => {
-    if (persistedRole === 'admin') {
-      setViewRole(nextRole);
-      setActiveTab(defaultTabForRole(nextRole));
-      return;
+  const handleToggleReaction = async (
+    ann: AnnouncementRecord,
+    reactionType: 'gotIt' | 'thanks'
+  ) => {
+    if (!user) return;
+    const reactionId = `${ann.id}_${user.uid}`;
+    const existing = reactions.find((r) => r.id === reactionId);
+    const updatedAt = new Date().toISOString();
+
+    try {
+      if (existing) {
+        const nextGotIt = reactionType === 'gotIt' ? !existing.gotIt : existing.gotIt;
+        const nextThanks = reactionType === 'thanks' ? !existing.thanks : existing.thanks;
+        await updateDoc(doc(db, 'announcementReactions', reactionId), {
+          gotIt: nextGotIt,
+          thanks: nextThanks,
+          updatedAt,
+        });
+      } else {
+        const record: AnnouncementReactionRecord = {
+          id: reactionId,
+          announcementId: ann.id,
+          userId: user.uid,
+          gotIt: reactionType === 'gotIt',
+          thanks: reactionType === 'thanks',
+          campusScope: 'attendly',
+          updatedAt,
+        };
+        await setDoc(doc(db, 'announcementReactions', reactionId), record);
+      }
+    } catch (err) {
+      handleFirestoreError(
+        err,
+        existing ? OperationType.UPDATE : OperationType.CREATE,
+        `announcementReactions/${reactionId}`
+      );
     }
-    await updateUserRole(nextRole);
-    setViewRole(nextRole);
-    setActiveTab(defaultTabForRole(nextRole));
   };
 
   useEffect(() => {
@@ -170,7 +201,7 @@ function Dashboard() {
     }
 
     const filterField =
-      viewRole === 'student' ? 'studentId' : viewRole === 'professor' ? 'professorId' : 'createdBy';
+      activeRole === 'student' ? 'studentId' : activeRole === 'professor' ? 'professorId' : 'createdBy';
 
     const attendanceQuery = query(
       collection(db, 'attendance'),
@@ -192,7 +223,7 @@ function Dashboard() {
     );
 
     return () => unsubscribe();
-  }, [user, viewRole]);
+  }, [user, activeRole]);
 
   useEffect(() => {
     if (!user) {
@@ -280,6 +311,63 @@ function Dashboard() {
     return () => unsubscribe();
   }, [user]);
 
+  useEffect(() => {
+    if (!user) {
+      setReactions([]);
+      return;
+    }
+
+    const reactionsQuery = query(
+      collection(db, 'announcementReactions'),
+      where('campusScope', '==', 'attendly')
+    );
+
+    const unsubscribe = onSnapshot(
+      reactionsQuery,
+      (snapshot) => {
+        const list: AnnouncementReactionRecord[] = [];
+        snapshot.forEach((docSnap) => {
+          list.push(docSnap.data() as AnnouncementReactionRecord);
+        });
+        setReactions(list);
+      },
+      (error) => {
+        handleFirestoreError(error, OperationType.LIST, 'announcementReactions');
+      }
+    );
+
+    return () => unsubscribe();
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) {
+      setAccountRequests([]);
+      return;
+    }
+
+    const reqQuery = query(
+      collection(db, 'accountRequests'),
+      where('campusScope', '==', 'attendly')
+    );
+
+    const unsubscribe = onSnapshot(
+      reqQuery,
+      (snapshot) => {
+        const list: AccountRequestRecord[] = [];
+        snapshot.forEach((docSnap) => {
+          list.push(docSnap.data() as AccountRequestRecord);
+        });
+        list.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+        setAccountRequests(list);
+      },
+      (error) => {
+        handleFirestoreError(error, OperationType.LIST, 'accountRequests');
+      }
+    );
+
+    return () => unsubscribe();
+  }, [user]);
+
   const activeSessionCount = sessions.filter((s) => s.status === 'active').length;
   const unreadSubjectAnnouncements = useMemo(
     () =>
@@ -288,93 +376,83 @@ function Dashboard() {
     [announcements, readAnnouncementIds]
   );
 
-  const isAdminPreview = persistedRole === 'admin' && viewRole !== 'admin';
-
   return (
-    <div
-      className="flex min-h-[100dvh] lg:h-screen lg:overflow-hidden font-sans bg-cover bg-center bg-no-repeat bg-fixed relative"
-      style={{ backgroundImage: `url('/assets/aistudio/image_2e397125.png')` }}
-    >
-      {/* Subtle overlay for depth and high contrast readability */}
-      <div className="fixed inset-0 bg-slate-900/10 backdrop-blur-[1px] pointer-events-none" />
-
+    <div className="fixed inset-0 h-[100dvh] max-h-[100dvh] w-full flex flex-col xl:flex-row overflow-hidden font-sans bg-[#ECE9FC] bg-[radial-gradient(circle_at_14%_8%,rgba(255,255,255,0.9)_0%,rgba(255,255,255,0)_48%),linear-gradient(145deg,rgba(255,255,255,0.72)_0%,rgba(236,233,252,0.92)_52%,rgba(255,255,255,0.48)_100%)] dark:bg-[#110E26] dark:bg-[radial-gradient(circle_at_14%_8%,rgba(255,255,255,0.08)_0%,rgba(255,255,255,0)_46%),linear-gradient(145deg,rgba(255,255,255,0.06)_0%,rgba(17,14,38,0.98)_52%,rgba(255,255,255,0.035)_100%)] text-slate-900 dark:text-white transition-colors duration-200 smooth-resize">
       <Sidebar
-        activeRole={viewRole}
-        onSelectViewRole={handleSelectViewRole}
+        activeRole={activeRole}
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         activeSessionCount={activeSessionCount}
         coursesCount={courses.length}
         announcementsCount={announcements.length}
         unreadAnnouncementsCount={unreadSubjectAnnouncements}
-        mobileOpen={mobileMenuOpen}
-        onCloseMobile={() => setMobileMenuOpen(false)}
+        centerActive={activeRole === 'professor' ? profScannerOpen : false}
+        onMobileCenterAction={
+          activeRole === 'professor'
+            ? () => {
+                if (courses.length === 0 || sessions.length === 0) {
+                  showToast('Load or create a subject session before scanning QR codes');
+                  return;
+                }
+                setProfScannerOpen(true);
+              }
+            : undefined
+        }
       />
 
-      {viewRole === 'admin' && (
+      {activeRole === 'admin' && (
         <AdminDashboard
           activeTab={activeTab}
           setActiveTab={setActiveTab}
-          onOpenMenu={() => setMobileMenuOpen(true)}
-          onSwitchDashboard={(target) => {
-            setViewRole(target);
-            setActiveTab(defaultTabForRole(target));
-          }}
           courses={courses}
           sessions={sessions}
           attendance={attendance}
           directory={directory}
+          accountRequests={accountRequests}
           announcements={announcements}
           announcementPhotos={announcementPhotos}
           onNotify={showToast}
         />
       )}
 
-      {viewRole === 'professor' && (
+      {activeRole === 'professor' && (
         <ProfessorDashboard
           activeTab={activeTab}
           setActiveTab={setActiveTab}
-          onOpenMenu={() => setMobileMenuOpen(true)}
-          isAdminPreview={isAdminPreview}
-          onReturnToAdmin={() => {
-            setViewRole('admin');
-            setActiveTab('overview');
-          }}
           courses={courses}
           sessions={sessions}
           attendance={attendance}
           announcements={announcements}
+          reactions={reactions}
           directory={directory}
+          scannerOpen={profScannerOpen}
+          setScannerOpen={setProfScannerOpen}
           onNotify={showToast}
         />
       )}
 
-      {viewRole === 'student' && (
+      {activeRole === 'student' && (
         <StudentDashboard
           activeTab={activeTab}
           setActiveTab={setActiveTab}
-          onOpenMenu={() => setMobileMenuOpen(true)}
-          isAdminPreview={isAdminPreview}
-          onReturnToAdmin={() => {
-            setViewRole('admin');
-            setActiveTab('overview');
-          }}
           courses={courses}
           sessions={sessions}
           attendance={attendance}
           announcements={announcements}
           announcementPhotos={announcementPhotos}
+          reactions={reactions}
           readAnnouncementIds={readAnnouncementIds}
           onMarkSubjectRead={handleMarkSubjectRead}
           onMarkAnnouncementRead={handleMarkAnnouncementRead}
+          onToggleReaction={handleToggleReaction}
           onNotify={showToast}
         />
       )}
 
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:bottom-6 sm:right-6 z-50 bg-slate-900/90 backdrop-blur-xl text-white px-4 py-3 rounded-xl shadow-xl border border-white/15 flex items-center gap-2.5 text-xs font-medium max-w-md">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+        <div className="fixed bottom-24 xl:bottom-6 left-4 right-4 sm:left-auto sm:right-6 z-[60] bg-[#171332] dark:bg-white text-white dark:text-[#171332] px-4 py-3 rounded-2xl shadow-xl border border-[#2C2654] dark:border-[#E7E3FA] flex items-center gap-2.5 text-xs font-bold max-w-md">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 dark:text-emerald-600 shrink-0" />
           <span className="truncate">{toastMessage}</span>
         </div>
       )}
@@ -387,17 +465,13 @@ function AppContent() {
 
   if (loading) {
     return (
-      <div
-        className="min-h-[100dvh] bg-cover bg-center bg-no-repeat flex flex-col items-center justify-center text-white relative p-4"
-        style={{ backgroundImage: `url('/assets/aistudio/image_2e397125.png')` }}
-      >
-        <div className="absolute inset-0 bg-slate-900/15 backdrop-blur-[1px] pointer-events-none" />
-        <div className="relative z-10 flex flex-col items-center">
+      <div className="min-h-[100dvh] bg-[#ECE9FC] bg-[radial-gradient(circle_at_14%_8%,rgba(255,255,255,0.9)_0%,rgba(255,255,255,0)_48%),linear-gradient(145deg,rgba(255,255,255,0.72)_0%,rgba(236,233,252,0.92)_52%,rgba(255,255,255,0.48)_100%)] dark:bg-[#110E26] dark:bg-[radial-gradient(circle_at_14%_8%,rgba(255,255,255,0.08)_0%,rgba(255,255,255,0)_46%),linear-gradient(145deg,rgba(255,255,255,0.06)_0%,rgba(17,14,38,0.98)_52%,rgba(255,255,255,0.035)_100%)] flex flex-col items-center justify-center text-slate-900 dark:text-white relative p-4 transition-colors duration-200">
+        <div className="flex flex-col items-center">
           <div className="mb-3">
-            <AttendlyLogo size="md" />
+            <AttendlyLogo size="md" showGlow />
           </div>
-          <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin mb-3" />
-          <p className="text-xs text-white/95 font-medium tracking-wide drop-shadow-xs">
+          <div className="w-6 h-6 border-2 border-[#6B5BF7] border-t-transparent rounded-full animate-spin mb-3" />
+          <p className="text-xs text-slate-600 dark:text-[#A6A0CE] font-semibold tracking-wide">
             Connecting to Attendly...
           </p>
         </div>
@@ -414,8 +488,10 @@ function AppContent() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </ThemeProvider>
   );
 }

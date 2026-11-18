@@ -121,6 +121,7 @@
         "courseCode": { "type": "string", "maxLength": 24 },
         "courseTitle": { "type": "string", "maxLength": 140 },
         "activityDate": { "type": "string", "maxLength": 32 },
+        "category": { "type": "string", "enum": ["info", "room_change", "quiz", "no_class", "official"], "maxLength": 24 },
         "photoCount": { "type": "integer" },
         "authorId": { "type": "string", "maxLength": 128 },
         "authorName": { "type": "string", "maxLength": 120 },
@@ -147,6 +148,43 @@
         "createdAt": { "type": "string", "maxLength": 64 }
       },
       "required": ["id", "announcementId", "name", "mimeType", "sizeBytes", "orderIndex", "dataUrl", "authorId", "campusScope", "createdAt"]
+    },
+    "AnnouncementReaction": {
+      "title": "Announcement Reaction",
+      "description": "Student or user acknowledgment reaction on a notice (Got it / Thanks)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "announcementId": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "gotIt": { "type": "boolean" },
+        "thanks": { "type": "boolean" },
+        "campusScope": { "type": "string", "maxLength": 32 },
+        "updatedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "announcementId", "userId", "gotIt", "thanks", "campusScope", "updatedAt"]
+    },
+    "AccountRequest": {
+      "title": "Campus Account Request",
+      "description": "Newly created Student or Professor accounts awaiting or completed Admin ID review",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "fullName": { "type": "string", "maxLength": 120 },
+        "email": { "type": "string", "maxLength": 256 },
+        "role": { "type": "string", "enum": ["professor", "student"], "maxLength": 24 },
+        "department": { "type": "string", "maxLength": 120 },
+        "studentCode": { "type": "string", "maxLength": 32 },
+        "photoDataUrl": { "type": "string", "maxLength": 150000 },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"], "maxLength": 24 },
+        "source": { "type": "string", "enum": ["self_signup", "admin_created"], "maxLength": 24 },
+        "reviewedBy": { "type": "string", "maxLength": 128 },
+        "reviewedAt": { "type": "string", "maxLength": 64 },
+        "campusScope": { "type": "string", "maxLength": 32 },
+        "createdBy": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "fullName", "email", "role", "status", "source", "campusScope", "createdBy", "createdAt"]
     }
   },
   "firestore": {
@@ -156,6 +194,8 @@
     "/sessions/{sessionId}": { "schema": "ClassSession", "description": "Scheduled and active sessions" },
     "/attendance/{recordId}": { "schema": "AttendanceRecord", "description": "Student attendance and QR scan records" },
     "/announcements/{announcementId}": { "schema": "Announcement", "description": "Official Admin and Professor subject announcements" },
-    "/announcementPhotos/{photoId}": { "schema": "AnnouncementPhoto", "description": "Validated photo attachments for official announcements" }
+    "/announcementPhotos/{photoId}": { "schema": "AnnouncementPhoto", "description": "Validated photo attachments for official announcements" },
+    "/announcementReactions/{reactionId}": { "schema": "AnnouncementReaction", "description": "User reactions on announcements" },
+    "/accountRequests/{requestId}": { "schema": "AccountRequest", "description": "Student and Professor account creation and Admin approval queue" }
   }
 }

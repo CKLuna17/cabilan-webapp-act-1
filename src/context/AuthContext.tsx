@@ -25,7 +25,7 @@ interface AuthContextType {
   userProfile: UserProfile | null;
   loading: boolean;
   authError: string | null;
-  signInWithEmail: (email: string, pass: string) => Promise<void>;
+  signInWithEmail: (email: string, pass: string, preferredRole?: UserRole) => Promise<void>;
   signUpWithEmail: (email: string, pass: string, name: string, role: UserRole, department?: string) => Promise<void>;
   signInWithGoogle: (preferredRole?: UserRole) => Promise<void>;
   signOutUser: () => Promise<void>;
@@ -60,6 +60,28 @@ async function syncDirectoryEntry(profile: UserProfile) {
     );
   } catch (err) {
     console.warn('Directory sync skipped:', err);
+  }
+}
+
+async function createSelfSignupAccountRequest(profile: UserProfile) {
+  if (profile.role !== 'student' && profile.role !== 'professor') return;
+  const reqId = `req_${profile.id}`;
+  try {
+    await setDoc(doc(db, 'accountRequests', reqId), {
+      id: reqId,
+      fullName: profile.displayName || 'Attendly Member',
+      email: profile.email || '',
+      role: profile.role,
+      department: profile.department || 'Computer Science',
+      studentCode: profile.studentCode || deriveStudentCode(profile.id),
+      status: 'pending',
+      source: 'self_signup',
+      campusScope: 'attendly',
+      createdBy: profile.id,
+      createdAt: profile.createdAt || new Date().toISOString(),
+    });
+  } catch (err) {
+    console.warn('Account review queue sync skipped:', err);
   }
 }
 
@@ -133,11 +155,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const clearAuthError = () => setAuthError(null);
 
-  const signInWithEmail = async (email: string, pass: string) => {
+  const signInWithEmail = async (email: string, pass: string, preferredRole?: UserRole) => {
     setAuthError(null);
     setLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, email.trim(), pass);
+      const cred = await signInWithEmailAndPassword(auth, email.trim(), pass);
+      if (preferredRole) {
+        const userDocRef = doc(db, 'users', cred.user.uid);
+        const snap = await getDoc(userDocRef);
+        const existingData = snap.exists() ? snap.data() : null;
+        const nextProfile: UserProfile = {
+          id: cred.user.uid,
+          email: existingData?.email || cred.user.email || email.trim(),
+          displayName:
+            existingData?.displayName ||
+            cred.user.displayName ||
+            email.split('@')[0] ||
+            'Attendly Member',
+          role: preferredRole,
+          department: existingData?.department || 'Computer Science',
+          studentCode: existingData?.studentCode || deriveStudentCode(cred.user.uid),
+          photoDataUrl:
+            typeof existingData?.photoDataUrl === 'string'
+              ? existingData.photoDataUrl
+              : undefined,
+          createdAt: existingData?.createdAt || new Date().toISOString(),
+        };
+        await setDoc(userDocRef, { role: preferredRole }, { merge: true });
+        await syncDirectoryEntry(nextProfile);
+        setUserProfile(nextProfile);
+      }
     } catch (err: unknown) {
       const errorObj = err as { code?: string };
       let msg = 'Failed to sign in. Please verify your email and password.';
@@ -191,6 +238,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         await setDoc(doc(db, 'users', newUser.uid), profileData);
         await syncDirectoryEntry(profileData);
+        await createSelfSignupAccountRequest(profileData);
       } catch (err) {
         handleFirestoreError(err, OperationType.CREATE, `users/${newUser.uid}`);
       }
@@ -234,7 +282,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
         await setDoc(userDocRef, newProfile);
         await syncDirectoryEntry(newProfile);
+        await createSelfSignupAccountRequest(newProfile);
         setUserProfile(newProfile);
+      } else if (preferredRole) {
+        const existingData = snap.data();
+        const updatedProfile: UserProfile = {
+          id: signedInUser.uid,
+          email: existingData.email || signedInUser.email || '',
+          displayName: existingData.displayName || signedInUser.displayName || 'Attendly Member',
+          role: preferredRole,
+          department: existingData.department || 'Computer Science',
+          studentCode: existingData.studentCode || deriveStudentCode(signedInUser.uid),
+          photoDataUrl:
+            typeof existingData.photoDataUrl === 'string'
+              ? existingData.photoDataUrl
+              : undefined,
+          createdAt: existingData.createdAt || new Date().toISOString(),
+        };
+        await setDoc(userDocRef, { role: preferredRole }, { merge: true });
+        await syncDirectoryEntry(updatedProfile);
+        setUserProfile(updatedProfile);
       }
     } catch (err: unknown) {
       const errorObj = err as { code?: string; message?: string };

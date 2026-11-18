@@ -81,6 +81,8 @@ export interface AttendanceRecord {
   createdBy: string;
 }
 
+export type AnnouncementCategory = 'info' | 'room_change' | 'quiz' | 'no_class' | 'official';
+
 export interface AnnouncementRecord {
   id: string;
   title: string;
@@ -90,6 +92,7 @@ export interface AnnouncementRecord {
   courseCode: string;
   courseTitle?: string;
   activityDate?: string;
+  category?: AnnouncementCategory;
   photoCount?: number;
   authorId: string;
   authorName: string;
@@ -111,10 +114,39 @@ export interface AnnouncementPhotoRecord {
   createdAt: string;
 }
 
+export interface AnnouncementReactionRecord {
+  id: string;
+  announcementId: string;
+  userId: string;
+  gotIt: boolean;
+  thanks: boolean;
+  campusScope: 'attendly';
+  updatedAt: string;
+}
+
 export interface StudentQRPayload {
   app: 'attendly';
   studentId: string;
   studentName: string;
   studentCode: string;
   department: string;
+}
+
+export type AccountRequestStatus = 'pending' | 'approved' | 'rejected';
+
+export interface AccountRequestRecord {
+  id: string;
+  fullName: string;
+  email: string;
+  role: 'professor' | 'student';
+  department?: string;
+  studentCode?: string;
+  photoDataUrl?: string;
+  status: AccountRequestStatus;
+  source: 'self_signup' | 'admin_created';
+  reviewedBy?: string;
+  reviewedAt?: string;
+  campusScope: 'attendly';
+  createdBy: string;
+  createdAt: string;
 }

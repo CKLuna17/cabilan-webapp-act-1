@@ -96,11 +96,11 @@ service cloud.firestore {
 
       allow get: if isSignedIn() && isValidId(userId);
       allow list: if isSignedIn() && resource.data.campusScope == 'attendly';
-      allow create: if isOwner(userId) && isValidId(userId) && isValidDirectoryEntry(incoming());
-      allow update: if isOwner(userId) && isValidId(userId) && isValidDirectoryEntry(incoming())
+      allow create: if (isOwner(userId) || isAdminRole()) && isValidId(userId) && isValidDirectoryEntry(incoming());
+      allow update: if (isOwner(userId) || isAdminRole()) && isValidId(userId) && isValidDirectoryEntry(incoming())
         && incoming().id == existing().id
         && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'role', 'department', 'studentCode', 'updatedAt']);
-      allow delete: if isOwner(userId) && isValidId(userId);
+      allow delete: if (isOwner(userId) || isAdminRole()) && isValidId(userId);
     }
 
     // Academic Courses & Room Schedules
@@ -222,7 +222,7 @@ service cloud.firestore {
     match /announcements/{announcementId} {
       function isValidAnnouncement(data) {
         return data.keys().hasAll(['id', 'title', 'message', 'scope', 'courseId', 'courseCode', 'authorId', 'authorName', 'authorRole', 'campusScope', 'createdAt'])
-          && data.keys().hasOnly(['id', 'title', 'message', 'scope', 'courseId', 'courseCode', 'courseTitle', 'activityDate', 'photoCount', 'authorId', 'authorName', 'authorRole', 'campusScope', 'createdAt'])
+          && data.keys().hasOnly(['id', 'title', 'message', 'scope', 'courseId', 'courseCode', 'courseTitle', 'activityDate', 'category', 'photoCount', 'authorId', 'authorName', 'authorRole', 'campusScope', 'createdAt'])
           && isValidId(data.id)
           && data.id == announcementId
           && data.title is string && data.title.size() > 0 && data.title.size() <= 140
@@ -232,6 +232,7 @@ service cloud.firestore {
           && data.courseCode is string && data.courseCode.size() > 0 && data.courseCode.size() <= 24
           && (!('courseTitle' in data) || (data.courseTitle is string && data.courseTitle.size() <= 140))
           && (!('activityDate' in data) || (data.activityDate is string && data.activityDate.size() <= 32))
+          && (!('category' in data) || (data.category in ['info', 'room_change', 'quiz', 'no_class', 'official']))
           && (!('photoCount' in data) || (data.photoCount is int && data.photoCount >= 0 && data.photoCount <= 4))
           && isValidId(data.authorId)
           && data.authorName is string && data.authorName.size() > 0 && data.authorName.size() <= 120
@@ -249,7 +250,7 @@ service cloud.firestore {
       allow update: if isSignedIn() && isValidId(announcementId) && isValidAnnouncement(incoming())
         && incoming().authorId == existing().authorId
         && (isAdminRole() || existing().authorId == request.auth.uid)
-        && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'message', 'activityDate', 'photoCount']);
+        && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'message', 'activityDate', 'category', 'photoCount']);
       allow delete: if isSignedIn() && isValidId(announcementId)
         && (isAdminRole() || existing().authorId == request.auth.uid);
     }
@@ -280,6 +281,70 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/announcements/$(incoming().announcementId));
       allow delete: if isSignedIn() && isValidId(photoId)
         && (isAdminRole() || existing().authorId == request.auth.uid);
+    }
+
+    // Notice Reactions (Got it / Thanks)
+    match /announcementReactions/{reactionId} {
+      function isValidReaction(data) {
+        return data.keys().hasAll(['id', 'announcementId', 'userId', 'gotIt', 'thanks', 'campusScope', 'updatedAt'])
+          && data.keys().hasOnly(['id', 'announcementId', 'userId', 'gotIt', 'thanks', 'campusScope', 'updatedAt'])
+          && isValidId(data.id)
+          && data.id == reactionId
+          && isValidId(data.announcementId)
+          && isValidId(data.userId)
+          && data.gotIt is bool
+          && data.thanks is bool
+          && data.campusScope == 'attendly'
+          && data.updatedAt is string && data.updatedAt.size() <= 64;
+      }
+
+      allow get: if isSignedIn() && isValidId(reactionId);
+      allow list: if isSignedIn() && resource.data.campusScope == 'attendly';
+      allow create: if isSignedIn() && isValidId(reactionId) && isValidReaction(incoming())
+        && incoming().userId == request.auth.uid;
+      allow update: if isSignedIn() && isValidId(reactionId) && isValidReaction(incoming())
+        && existing().userId == request.auth.uid
+        && incoming().userId == existing().userId
+        && incoming().announcementId == existing().announcementId
+        && incoming().diff(existing()).affectedKeys().hasOnly(['gotIt', 'thanks', 'updatedAt']);
+      allow delete: if isSignedIn() && isValidId(reactionId) && existing().userId == request.auth.uid;
+    }
+
+    // Newly Created Student & Professor Account Requests for Admin ID Review
+    match /accountRequests/{requestId} {
+      function isValidAccountRequest(data) {
+        return data.keys().hasAll(['id', 'fullName', 'email', 'role', 'status', 'source', 'campusScope', 'createdBy', 'createdAt'])
+          && data.keys().hasOnly(['id', 'fullName', 'email', 'role', 'department', 'studentCode', 'photoDataUrl', 'status', 'source', 'reviewedBy', 'reviewedAt', 'campusScope', 'createdBy', 'createdAt'])
+          && isValidId(data.id)
+          && data.id == requestId
+          && data.fullName is string && data.fullName.size() > 0 && data.fullName.size() <= 120
+          && data.email is string && data.email.size() > 0 && data.email.size() <= 256
+          && data.role in ['professor', 'student']
+          && (!('department' in data) || (data.department is string && data.department.size() <= 120))
+          && (!('studentCode' in data) || (data.studentCode is string && data.studentCode.size() <= 32))
+          && (!('photoDataUrl' in data) || (data.photoDataUrl is string && data.photoDataUrl.size() <= 150000))
+          && data.status in ['pending', 'approved', 'rejected']
+          && data.source in ['self_signup', 'admin_created']
+          && (!('reviewedBy' in data) || (data.reviewedBy is string && data.reviewedBy.size() <= 128))
+          && (!('reviewedAt' in data) || (data.reviewedAt is string && data.reviewedAt.size() <= 64))
+          && data.campusScope == 'attendly'
+          && isValidId(data.createdBy)
+          && data.createdAt is string && data.createdAt.size() <= 64;
+      }
+
+      allow get: if isSignedIn() && isValidId(requestId)
+        && (isAdminRole() || existing().createdBy == request.auth.uid);
+      allow list: if isSignedIn() && resource.data.campusScope == 'attendly';
+      allow create: if isSignedIn() && isValidId(requestId) && isValidAccountRequest(incoming())
+        && incoming().createdBy == request.auth.uid
+        && ((incoming().source == 'self_signup' && incoming().status == 'pending')
+          || (incoming().source == 'admin_created' && isAdminRole()));
+      allow update: if isSignedIn() && isValidId(requestId) && isValidAccountRequest(incoming())
+        && isAdminRole()
+        && incoming().id == existing().id
+        && incoming().createdBy == existing().createdBy
+        && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'reviewedBy', 'reviewedAt']);
+      allow delete: if isSignedIn() && isValidId(requestId) && isAdminRole();
     }
 
     // Legacy File records
