@@ -54,7 +54,7 @@ export const AuthPage: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-[100dvh] bg-[#ECE9FC] bg-[radial-gradient(circle_at_14%_8%,rgba(255,255,255,0.9)_0%,rgba(255,255,255,0)_48%),linear-gradient(145deg,rgba(255,255,255,0.72)_0%,rgba(236,233,252,0.92)_52%,rgba(255,255,255,0.48)_100%)] dark:bg-[#110E26] dark:bg-[radial-gradient(circle_at_14%_8%,rgba(255,255,255,0.08)_0%,rgba(255,255,255,0)_46%),linear-gradient(145deg,rgba(255,255,255,0.06)_0%,rgba(17,14,38,0.98)_52%,rgba(255,255,255,0.035)_100%)] text-slate-900 dark:text-white flex flex-col items-center justify-center p-4 sm:p-6 relative overflow-x-hidden transition-colors duration-200">
+    <div className="min-h-[100dvh] bg-[#ECE9FC] bg-[radial-gradient(circle_at_14%_8%,rgba(255,255,255,0.9)_0%,rgba(255,255,255,0)_48%),linear-gradient(145deg,rgba(255,255,255,0.72)_0%,rgba(236,233,252,0.92)_52%,rgba(255,255,255,0.48)_100%)] dark:bg-[#110E26] dark:bg-[radial-gradient(circle_at_14%_8%,rgba(255,255,255,0.08)_0%,rgba(255,255,255,0)_46%),linear-gradient(145deg,rgba(255,255,255,0.06)_0%,rgba(17,14,38,0.98)_52%,rgba(255,255,255,0.035)_100%)] text-slate-900 dark:text-white flex flex-col items-center justify-center px-4 pb-8 pt-[max(2.25rem,env(safe-area-inset-top))] sm:px-6 sm:pt-10 sm:pb-10 xl:p-6 relative overflow-x-hidden transition-colors duration-200 smooth-resize">
       {/* Subtle Ambient Indigo Glow */}
       <div
         aria-hidden="true"

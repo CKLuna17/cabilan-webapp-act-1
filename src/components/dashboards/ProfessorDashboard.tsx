@@ -459,7 +459,7 @@ export const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({
   return (
     <div className="flex-1 flex flex-col min-w-0 min-h-0 xl:h-full overflow-y-auto subtle-scrollbar smooth-scroll smooth-resize">
       {/* Unified Top Header (Desktop + Tablet + Mobile) with Single Top-Right Scan Student QR */}
-      <header className="px-4 xl:px-7 pt-[max(1.35rem,env(safe-area-inset-top))] sm:pt-6 xl:pt-6 pb-2 flex items-center justify-between gap-3 smooth-resize">
+      <header className="px-4 sm:px-6 xl:px-7 pt-[max(2.25rem,env(safe-area-inset-top))] sm:pt-9 xl:pt-6 pb-3 flex items-center justify-between gap-3 smooth-resize">
         {/* Desktop Title + Current Date */}
         <div className="hidden xl:block min-w-0">
           <div className="flex items-center gap-3">
@@ -540,7 +540,7 @@ export const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({
         </div>
       </header>
 
-      <main className="px-4 xl:px-7 pt-3 xl:pt-4 pb-28 xl:pb-8 max-w-[1400px] w-full mx-auto space-y-5 flex-1 smooth-resize">
+      <main className="px-4 sm:px-6 xl:px-7 pt-3.5 sm:pt-4 xl:pt-4 pb-28 xl:pb-8 max-w-[1400px] w-full mx-auto space-y-5 flex-1 smooth-resize">
         {courses.length === 0 && (
           <div className="bg-white dark:bg-[#1B1738] rounded-3xl border border-[#E7E3FA] dark:border-[#2C2654] p-6 text-center space-y-3">
             <p className="text-sm font-bold text-slate-900 dark:text-white">

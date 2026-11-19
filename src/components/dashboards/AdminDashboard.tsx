@@ -676,7 +676,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   return (
     <div className="flex-1 flex flex-col min-w-0 min-h-0 xl:h-full overflow-y-auto subtle-scrollbar smooth-scroll smooth-resize">
       {/* Unified Top Header (Desktop + Tablet + Mobile) */}
-      <header className="px-4 xl:px-7 pt-[max(1.35rem,env(safe-area-inset-top))] sm:pt-6 xl:pt-4 pb-1.5 flex items-center justify-between gap-3 smooth-resize">
+      <header className="px-4 sm:px-6 xl:px-7 pt-[max(2.25rem,env(safe-area-inset-top))] sm:pt-9 xl:pt-5 pb-3 flex items-center justify-between gap-3 smooth-resize">
         <div className="hidden xl:block min-w-0">
           <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
             Campus overview
@@ -750,7 +750,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       </header>
 
-      <main className="px-4 xl:px-7 pt-1.5 xl:pt-2 pb-28 xl:pb-8 max-w-[1400px] w-full mx-auto space-y-3.5 flex-1 smooth-resize">
+      <main className="px-4 sm:px-6 xl:px-7 pt-3 sm:pt-4 xl:pt-3 pb-28 xl:pb-8 max-w-[1400px] w-full mx-auto space-y-4 flex-1 smooth-resize">
         {/* 4 KPI Cards */}
         {activeTab !== 'profile' && (
           <div className="grid grid-cols-1 min-[360px]:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-3.5 smooth-resize">
